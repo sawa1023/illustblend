@@ -1,0 +1,33 @@
+name: Windows 앱 빌드 및 배포
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npx electron-builder --win portable --x64 --publish never
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}
+          name: IllustBlend ${{ github.ref_type == 'tag' && github.ref_name || github.run_number }} (Windows)
+          body: |
+            Windows용 실행 파일입니다. `IllustBlend-*.exe`를 받아 더블클릭하면 설치 없이 실행됩니다.
+            처음에 "Windows의 PC 보호" 창이 뜨면 **추가 정보 → 실행**을 누르세요.
+
+            웹/아이패드 버전: https://sawa1023.github.io/illustblend/
+          files: app/dist/*.exe
