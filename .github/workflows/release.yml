@@ -2,7 +2,8 @@ name: Windows 앱 빌드 및 배포
 
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: ['app/**', '.github/workflows/release.yml']
   workflow_dispatch:
 
 permissions:
@@ -21,10 +22,14 @@ jobs:
           node-version: 20
       - run: npm install
       - run: npx electron-builder --win portable --x64 --publish never
+      - id: ver
+        shell: bash
+        run: echo "v=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', github.run_number) }}
-          name: IllustBlend ${{ github.ref_type == 'tag' && github.ref_name || github.run_number }} (Windows)
+          tag_name: v${{ steps.ver.outputs.v }}
+          name: IllustBlend ${{ steps.ver.outputs.v }} (Windows)
+          overwrite_files: true
           body: |
             Windows용 실행 파일입니다. `IllustBlend-*.exe`를 받아 더블클릭하면 설치 없이 실행됩니다.
             처음에 "Windows의 PC 보호" 창이 뜨면 **추가 정보 → 실행**을 누르세요.
