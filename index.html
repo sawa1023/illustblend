@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="배경과 인물 레이어를 쌓고, 원본은 그대로 둔 채 필터 층만 얹어 어우러지게 하는 합성 도구">
+<meta name="theme-color" content="#2a2a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="IllustBlend">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>IllustBlend</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="menubar">
+  <button class="tbtn icon" data-cmd="togglePanel" title="레이어 패널">☰</button>
+  <span class="brand">IllustBlend</span>
+  <div class="menu" data-menu="file"><button>파일</button>
+    <div class="drop">
+      <button data-cmd="open">열기… <kbd>Ctrl+O</kbd></button>
+      <button data-cmd="newLayer">새 레이어 <kbd>Ctrl+Shift+N</kbd></button>
+      <hr>
+      <button data-cmd="canvasSize">캔버스 크기… <kbd>Ctrl+Alt+C</kbd></button>
+      <hr>
+      <button data-cmd="export">PNG로 내보내기… <kbd>Ctrl+S</kbd></button>
+    </div>
+  </div>
+  <div class="menu" data-menu="layer"><button>레이어</button>
+    <div class="drop">
+      <button data-cmd="newLayer">새 레이어</button>
+      <button data-cmd="rename">이름 바꾸기</button>
+      <button data-cmd="dupLayer">레이어 복제 <kbd>Ctrl+J</kbd></button>
+      <button data-cmd="delLayer">레이어 삭제 <kbd>Delete</kbd></button>
+      <hr>
+      <button data-cmd="roleCharacter">인물 레이어로 지정</button>
+      <button data-cmd="roleBackground">배경 레이어로 지정</button>
+      <button data-cmd="roleNone">일반 레이어로 지정 (필터 없음)</button>
+      <hr>
+      <button data-cmd="fitCover">캔버스 꽉 채우기</button>
+      <button data-cmd="fitContain">캔버스 안에 맞추기</button>
+      <button data-cmd="fitNatural">원본 크기 (100%)</button>
+      <button data-cmd="flip">좌우 반전</button>
+      <hr>
+      <button data-cmd="up">한 단계 위로 <kbd>Ctrl+]</kbd></button>
+      <button data-cmd="down">한 단계 아래로 <kbd>Ctrl+[</kbd></button>
+    </div>
+  </div>
+  <div class="menu" data-menu="window"><button>창</button>
+    <div class="drop">
+      <button data-cmd="winComp">합성 패널</button>
+      <button data-cmd="winFx">효과 옵션</button>
+      <hr>
+      <button data-cmd="resetWins">창 위치 초기화</button>
+    </div>
+  </div>
+  <div class="menu" data-menu="view"><button>보기</button>
+    <div class="drop">
+      <button data-cmd="togglePanel">레이어 패널 보이기/숨기기</button>
+      <button data-cmd="zoomFit">화면에 맞추기 <kbd>Ctrl+0</kbd></button>
+      <button data-cmd="zoom100">실제 크기 <kbd>Ctrl+1</kbd></button>
+      <button data-cmd="zoomIn">확대 <kbd>Ctrl++</kbd></button>
+      <button data-cmd="zoomOut">축소 <kbd>Ctrl+-</kbd></button>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <button id="ratioBtn" class="tbtn" data-cmd="lockRatio" title="켜면 크기 조절 때 비율이 유지돼요 (Shift와 같음)">비율 고정</button>
+  <button id="compareBtn" class="tbtn" title="누르면 보정을 잠시 숨기고 원본만 보여줍니다 (F키)">보정 전/후 <kbd>F</kbd></button>
+  <button id="exportTop" class="tbtn primary">내보내기</button>
+</header>
+
+<div id="body">
+  <aside id="layersPanel">
+    <div class="phead">레이어 <span class="canvasInfo" id="canvasInfo"></span></div>
+    <div id="layerList"></div>
+    <div class="ltools">
+      <button data-cmd="newLayer" title="새 레이어">＋ 새 레이어</button>
+      <button data-cmd="open" title="파일 열기">열기</button>
+      <button data-cmd="up" title="위로">▲</button>
+      <button data-cmd="down" title="아래로">▼</button>
+      <button data-cmd="delLayer" title="삭제">🗑</button>
+    </div>
+    <p class="hint">레이어를 선택한 채로 이미지를 창에 끌어 놓거나 파일 → 열기로 넣으세요. 이름 옆 <b>인물/배경</b> 버튼으로 필터가 적용될 대상을 정합니다.</p>
+  </aside>
+  <main id="stage">
+    <canvas id="vp"></canvas>
+    <div id="compareBadge" hidden>보정 전 (원본)</div>
+    <div id="zoomInfo"></div>
+  </main>
+</div>
+<div id="statusbar"><span id="status">레이어를 추가하고 이미지를 넣어 시작하세요.</span><span class="keys">드래그: 이동 · 핸들: 크기 (Shift = 비율 고정) · 휠: 확대/축소 · Space+드래그: 화면 이동</span></div>
+
+<!-- 합성 패널 (떠 있는 창) -->
+<section class="fwin" id="winComp" data-def="right:16,top:52,w:372">
+  <div class="fhead"><b>합성 패널</b><span class="fbtns"><button class="fmin" title="접기">▁</button><button class="fclose" title="닫기">✕</button></span></div>
+  <div class="fbody">
+    <details open class="sec"><summary>레이어 구성</summary>
+      <div id="roleSummary" class="hint"></div>
+      <div id="feels"></div>
+    </details>
+
+    <details open class="sec"><summary>기본 보정</summary>
+      <div class="tabs" id="basicTabs"></div>
+      <div class="grid2" id="basic"></div>
+    </details>
+
+    <details open class="sec"><summary>조명 <small>(인물)</small></summary>
+      <div class="grid2" id="lightA"></div>
+      <div class="rimrow">
+        <label class="check"><input type="checkbox" id="rimOn"> 테두리 빛</label>
+        <label class="check"><input type="color" id="lightColor"> 빛 색</label>
+      </div>
+      <div class="dirrow">
+        <div><div class="lbl">빛이 비추는 방향 <span id="dirVal"></span></div><div id="dirGrid"></div></div>
+        <div class="depth" id="lightB"></div>
+      </div>
+    </details>
+
+    <details open class="sec"><summary>효과</summary>
+      <div id="glowBox"></div>
+      <div class="lbl">컬러 프리셋 <small>(여러 개 겹치기 가능)</small></div>
+      <div id="colorRows"></div>
+      <button id="addColor" class="wide">＋ 컬러 프리셋 추가</button>
+      <button id="openFx" class="wide accent">효과 옵션 열기 <span id="fxCount"></span></button>
+    </details>
+
+    <details class="sec"><summary>내 프리셋</summary>
+      <div class="row"><input type="text" id="presetName" placeholder="프리셋 이름"><button id="savePreset">저장</button></div>
+      <div class="row"><select id="presetList"></select><button id="loadPreset">불러오기</button><button id="delPreset">삭제</button></div>
+    </details>
+
+    <div class="sec flat">
+      <div id="strengthBox"></div>
+      <div class="row"><button id="resetAll">설정 초기화</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- 효과 옵션 (떠 있는 창) -->
+<section class="fwin" id="winFx" data-def="left:300,top:90,w:560" hidden>
+  <div class="fhead"><b>효과 옵션</b><span class="fbtns"><button class="fmin" title="접기">▁</button><button class="fclose" title="닫기">✕</button></span></div>
+  <div class="fbody">
+    <div class="tabs" id="fxTabs"></div>
+    <div id="fxCards"></div>
+    <p class="hint">각 효과는 적용 대상(인물/배경/전체 화면)을 고를 수 있어요. 창은 제목줄을 끌어 옮기고, 오른쪽 아래 모서리로 크기를 바꿀 수 있어요.</p>
+  </div>
+</section>
+
+<!-- 캔버스 크기 -->
+<div id="sizeModal" class="modal" hidden>
+  <div class="sheet small">
+    <b>캔버스 크기</b>
+    <div class="row"><label>가로 <input type="number" id="cw" min="16" max="8000"></label><label>세로 <input type="number" id="ch" min="16" max="8000"></label></div>
+    <div class="row wrap" id="sizePresets"></div>
+    <label class="check"><input type="checkbox" id="keepCenter" checked> 레이어를 가운데 기준으로 유지</label>
+    <div class="row"><button id="sizeCancel">취소</button><button id="sizeOk" class="primary">적용</button></div>
+  </div>
+</div>
+
+<input type="file" id="openFile" accept="image/*" multiple hidden>
+<script src="engine.js"></script>
+<script src="effects.js"></script>
+<script src="app.js"></script>
+<script>if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+</body>
+</html>
