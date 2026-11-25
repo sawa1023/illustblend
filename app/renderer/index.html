@@ -7,147 +7,217 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<svg class="sprite" aria-hidden="true">
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="m2 13 10 5 10-5"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M21 18h-1"/><circle cx="16" cy="6" r="2.2"/><circle cx="10" cy="12" r="2.2"/><circle cx="18" cy="18" r="2.2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+  <symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/><path d="M12 4h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7Z" fill="currentColor" stroke="none" opacity=".45"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-popout" viewBox="0 0 24 24"><rect x="3" y="8" width="13" height="13" rx="2"/><path d="M12 3h9v9M21 3l-8 8"/></symbol>
+  <symbol id="i-min" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+</svg>
+
 <header id="menubar">
-  <button class="tbtn icon" data-cmd="togglePanel" title="레이어 패널">☰</button>
-  <span class="brand">IllustBlend</span>
-  <div class="menu" data-menu="file"><button>파일</button>
-    <div class="drop">
-      <button data-cmd="open">열기… <kbd>Ctrl+O</kbd></button>
-      <button data-cmd="newLayer">새 레이어 <kbd>Ctrl+Shift+N</kbd></button>
-      <hr>
-      <button data-cmd="canvasSize">캔버스 크기… <kbd>Ctrl+Alt+C</kbd></button>
-      <hr>
-      <button data-cmd="export">PNG로 내보내기… <kbd>Ctrl+S</kbd></button>
+  <button class="iconbtn narrow-l" data-cmd="togglePanel" title="레이어 패널"><svg class="ic"><use href="#i-layers"/></svg></button>
+  <div class="brand"><i class="logo"></i>IllustBlend</div>
+  <nav class="menus">
+    <div class="menu" data-menu="file"><button>파일</button>
+      <div class="drop">
+        <button data-cmd="open">이미지 열기… <kbd>Ctrl+O</kbd></button>
+        <button data-cmd="newLayer">새 레이어 <kbd>Ctrl+Shift+N</kbd></button>
+        <hr>
+        <button data-cmd="canvasSize">캔버스 크기… <kbd>Ctrl+Alt+C</kbd></button>
+        <hr>
+        <button data-cmd="export">PNG로 내보내기… <kbd>Ctrl+S</kbd></button>
+      </div>
     </div>
-  </div>
-  <div class="menu" data-menu="layer"><button>레이어</button>
-    <div class="drop">
-      <button data-cmd="newLayer">새 레이어</button>
-      <button data-cmd="rename">이름 바꾸기</button>
-      <button data-cmd="dupLayer">레이어 복제 <kbd>Ctrl+J</kbd></button>
-      <button data-cmd="delLayer">레이어 삭제 <kbd>Delete</kbd></button>
-      <hr>
-      <button data-cmd="roleCharacter">인물 레이어로 지정</button>
-      <button data-cmd="roleBackground">배경 레이어로 지정</button>
-      <button data-cmd="roleNone">일반 레이어로 지정 (필터 없음)</button>
-      <hr>
-      <button data-cmd="fitCover">캔버스 꽉 채우기</button>
-      <button data-cmd="fitContain">캔버스 안에 맞추기</button>
-      <button data-cmd="fitNatural">원본 크기 (100%)</button>
-      <button data-cmd="flip">좌우 반전</button>
-      <hr>
-      <button data-cmd="up">한 단계 위로 <kbd>Ctrl+]</kbd></button>
-      <button data-cmd="down">한 단계 아래로 <kbd>Ctrl+[</kbd></button>
+    <div class="menu" data-menu="layer"><button>레이어</button>
+      <div class="drop">
+        <button data-cmd="newLayer">새 레이어</button>
+        <button data-cmd="rename">이름 바꾸기</button>
+        <button data-cmd="dupLayer">레이어 복제 <kbd>Ctrl+J</kbd></button>
+        <button data-cmd="delLayer">레이어 삭제 <kbd>Delete</kbd></button>
+        <hr>
+        <button data-cmd="roleCharacter">인물 레이어로 지정</button>
+        <button data-cmd="roleBackground">배경 레이어로 지정</button>
+        <button data-cmd="roleNone">일반 레이어로 지정 (필터 없음)</button>
+        <hr>
+        <button data-cmd="fitCover">캔버스 꽉 채우기</button>
+        <button data-cmd="fitContain">캔버스 안에 맞추기</button>
+        <button data-cmd="fitNatural">원본 크기 (100%)</button>
+        <button data-cmd="flip">좌우 반전</button>
+        <button data-cmd="lockRatio" class="chk" id="ratioItem">크기 조절 때 비율 고정 <kbd>Shift</kbd></button>
+        <hr>
+        <button data-cmd="up">한 단계 위로 <kbd>Ctrl+]</kbd></button>
+        <button data-cmd="down">한 단계 아래로 <kbd>Ctrl+[</kbd></button>
+      </div>
     </div>
-  </div>
-  <div class="menu" data-menu="window"><button>창</button>
-    <div class="drop">
-      <button data-cmd="winComp">합성 패널</button>
-      <button data-cmd="winFx">효과 옵션</button>
-      <hr>
-      <button data-cmd="resetWins">창 위치 초기화</button>
+    <div class="menu" data-menu="window"><button>창</button>
+      <div class="drop">
+        <button data-cmd="togglePanel" class="chk" id="panelItem">레이어 패널</button>
+        <button data-cmd="winComp" class="chk" id="compItem">합성 패널</button>
+        <button data-cmd="winFx" class="chk" id="fxItem">효과 옵션</button>
+        <hr>
+        <button data-cmd="dockComp" id="dockItem">합성 패널 떼어내기</button>
+        <button data-cmd="resetWins">창 배치 초기화</button>
+      </div>
     </div>
-  </div>
-  <div class="menu" data-menu="view"><button>보기</button>
-    <div class="drop">
-      <button data-cmd="togglePanel">레이어 패널 보이기/숨기기</button>
-      <button data-cmd="zoomFit">화면에 맞추기 <kbd>Ctrl+0</kbd></button>
-      <button data-cmd="zoom100">실제 크기 <kbd>Ctrl+1</kbd></button>
-      <button data-cmd="zoomIn">확대 <kbd>Ctrl++</kbd></button>
-      <button data-cmd="zoomOut">축소 <kbd>Ctrl+-</kbd></button>
+    <div class="menu" data-menu="view"><button>보기</button>
+      <div class="drop">
+        <button data-cmd="zoomFit">화면에 맞추기 <kbd>Ctrl+0</kbd></button>
+        <button data-cmd="zoom100">실제 크기 <kbd>Ctrl+1</kbd></button>
+        <button data-cmd="zoomIn">확대 <kbd>Ctrl++</kbd></button>
+        <button data-cmd="zoomOut">축소 <kbd>Ctrl+-</kbd></button>
+        <hr>
+        <button data-cmd="togglePanels">패널 모두 숨기기/보이기 <kbd>Tab</kbd></button>
+      </div>
     </div>
-  </div>
+  </nav>
   <div class="spacer"></div>
-  <button id="ratioBtn" class="tbtn" data-cmd="lockRatio" title="켜면 크기 조절 때 비율이 유지돼요 (Shift와 같음)">비율 고정</button>
-  <button id="compareBtn" class="tbtn" title="누르면 보정을 잠시 숨기고 원본만 보여줍니다 (F키)">보정 전/후 <kbd>F</kbd></button>
-  <button id="exportTop" class="tbtn primary">내보내기</button>
+  <button id="ratioBtn" class="iconbtn touch-only" data-cmd="lockRatio" title="비율 고정: 켜면 크기 조절 때 가로세로 비율이 유지돼요 (Shift와 같음)"><svg class="ic"><use href="#i-link"/></svg></button>
+  <button id="compareBtn" class="tbtn" title="누르면 보정을 잠시 숨기고 원본만 보여줍니다 (F키)"><svg class="ic"><use href="#i-compare"/></svg>전/후<kbd>F</kbd></button>
+  <button id="exportTop" class="tbtn primary" title="PNG로 내보내기 (Ctrl+S)"><svg class="ic"><use href="#i-export"/></svg>내보내기</button>
+  <button class="iconbtn narrow-r" data-cmd="toggleDock" title="합성 패널"><svg class="ic"><use href="#i-sliders"/></svg></button>
 </header>
 
 <div id="body">
-  <aside id="layersPanel">
-    <div class="phead">레이어 <span class="canvasInfo" id="canvasInfo"></span></div>
-    <div id="layerList"></div>
-    <div class="ltools">
-      <button data-cmd="newLayer" title="새 레이어">＋ 새 레이어</button>
-      <button data-cmd="open" title="파일 열기">열기</button>
-      <button data-cmd="up" title="위로">▲</button>
-      <button data-cmd="down" title="아래로">▼</button>
-      <button data-cmd="delLayer" title="삭제">🗑</button>
+  <aside id="layersPanel" class="panel">
+    <div class="ptitle">레이어</div>
+    <div id="layerProps">
+      <div class="seg" id="roleSeg" title="필터가 적용될 대상">
+        <button data-role="character"><i class="dot character"></i>인물</button>
+        <button data-role="background"><i class="dot background"></i>배경</button>
+        <button data-role="none"><i class="dot none"></i>일반</button>
+      </div>
+      <div id="opacityBox"></div>
     </div>
-    <p class="hint">레이어를 선택한 채로 이미지를 창에 끌어 놓거나 파일 → 열기로 넣으세요. 이름 옆 <b>인물/배경</b> 버튼으로 필터가 적용될 대상을 정합니다.</p>
+    <div id="layerList"></div>
+    <div class="pfoot">
+      <button class="iconbtn" data-cmd="newLayer" title="새 레이어 (Ctrl+Shift+N)"><svg class="ic"><use href="#i-plus"/></svg></button>
+      <button class="iconbtn" data-cmd="open" title="이미지 열기 (Ctrl+O)"><svg class="ic"><use href="#i-folder"/></svg></button>
+      <span class="spacer"></span>
+      <button class="iconbtn" data-cmd="dupLayer" title="레이어 복제 (Ctrl+J)"><svg class="ic"><use href="#i-copy"/></svg></button>
+      <button class="iconbtn" data-cmd="delLayer" title="레이어 삭제 (Delete)"><svg class="ic"><use href="#i-trash"/></svg></button>
+    </div>
   </aside>
+  <div class="splitter" id="splitL" title="끌어서 패널 너비 조절"></div>
   <main id="stage">
     <canvas id="vp"></canvas>
-    <div id="compareBadge" hidden>보정 전 (원본)</div>
-    <div id="zoomInfo"></div>
+    <div id="compareBadge" hidden>보정 전 · 원본</div>
+    <div id="viewChip"><button id="docInfo" title="캔버스 크기 바꾸기 (Ctrl+Alt+C)"></button><button id="zoomInfo" title="화면에 맞추기 (Ctrl+0)"></button></div>
   </main>
+  <div class="splitter" id="splitR" title="끌어서 패널 너비 조절"></div>
+  <aside id="dock" class="panel"></aside>
 </div>
-<div id="statusbar"><span id="status">레이어를 추가하고 이미지를 넣어 시작하세요.</span><span class="keys">드래그: 이동 · 핸들: 크기 (Shift = 비율 고정) · 휠: 확대/축소 · Space+드래그: 화면 이동</span></div>
+<div id="statusbar"><span id="status">레이어를 추가하고 이미지를 넣어 시작하세요.</span><span class="keys">드래그: 이동 · 핸들: 크기 (Shift = 비율 고정) · 휠: 확대/축소 · Space+드래그: 화면 이동 · 레이어는 끌어서 순서 변경</span></div>
+<div id="dockHint" hidden></div>
 
-<!-- 합성 패널 (떠 있는 창) -->
-<section class="fwin" id="winComp" data-def="right:16,top:52,w:372">
-  <div class="fhead"><b>합성 패널</b><span class="fbtns"><button class="fmin" title="접기">▁</button><button class="fclose" title="닫기">✕</button></span></div>
+<!-- 합성 패널 (오른쪽에 붙어 있거나 떠 있는 창) -->
+<section class="fwin" id="winComp" data-def="right:16,top:56,w:340" data-dock="1" data-title="합성 패널">
+  <div class="fhead"><b>합성</b><span class="fbtns">
+    <button class="fpop" title="떼어내기 / 오른쪽에 붙이기"><svg class="ic"><use href="#i-popout"/></svg></button>
+    <button class="fmin" title="접기"><svg class="ic"><use href="#i-min"/></svg></button>
+    <button class="fclose" title="닫기"><svg class="ic"><use href="#i-close"/></svg></button></span></div>
   <div class="fbody">
-    <details open class="sec"><summary>레이어 구성</summary>
-      <div id="roleSummary" class="hint"></div>
-      <div id="feels"></div>
+    <details open class="sec"><summary>빠른 느낌</summary>
+      <div class="secbody">
+        <div id="roleSummary" class="hint"></div>
+        <div id="feels"></div>
+      </div>
     </details>
 
     <details open class="sec"><summary>기본 보정</summary>
-      <div class="tabs" id="basicTabs"></div>
-      <div class="grid2" id="basic"></div>
+      <div class="secbody">
+        <div class="tabs" id="basicTabs"></div>
+        <div id="basic"></div>
+      </div>
     </details>
 
-    <details open class="sec"><summary>조명 <small>(인물)</small></summary>
-      <div class="grid2" id="lightA"></div>
-      <div class="rimrow">
-        <label class="check"><input type="checkbox" id="rimOn"> 테두리 빛</label>
-        <label class="check"><input type="color" id="lightColor"> 빛 색</label>
-      </div>
-      <div class="dirrow">
-        <div><div class="lbl">빛이 비추는 방향 <span id="dirVal"></span></div><div id="dirGrid"></div></div>
-        <div class="depth" id="lightB"></div>
+    <details open class="sec"><summary>조명 <small>인물</small></summary>
+      <div class="secbody">
+        <div id="lightA"></div>
+        <div class="dirrow">
+          <div id="dirGrid"></div>
+          <div class="dirside">
+            <div class="lbl">빛 방향 <span id="dirVal"></span></div>
+            <label class="check"><input type="checkbox" id="rimOn" class="switch"> 테두리 빛</label>
+            <label class="check"><input type="color" id="lightColor"> 빛 색</label>
+          </div>
+        </div>
+        <div id="lightB"></div>
       </div>
     </details>
 
     <details open class="sec"><summary>효과</summary>
-      <div id="glowBox"></div>
-      <div class="lbl">컬러 프리셋 <small>(여러 개 겹치기 가능)</small></div>
-      <div id="colorRows"></div>
-      <button id="addColor" class="wide">＋ 컬러 프리셋 추가</button>
-      <button id="openFx" class="wide accent">효과 옵션 열기 <span id="fxCount"></span></button>
+      <div class="secbody">
+        <div id="glowBox"></div>
+        <div class="lbl">컬러 프리셋 <small>여러 개 겹치기 가능</small></div>
+        <div id="colorRows"></div>
+        <button id="addColor" class="ghostbtn"><svg class="ic"><use href="#i-plus"/></svg>컬러 프리셋 추가</button>
+        <button id="openFx" class="wide accent"><b class="fx">fx</b>효과 옵션 <span id="fxCount"></span></button>
+      </div>
     </details>
 
     <details class="sec"><summary>내 프리셋</summary>
-      <div class="row"><input type="text" id="presetName" placeholder="프리셋 이름"><button id="savePreset">저장</button></div>
-      <div class="row"><select id="presetList"></select><button id="loadPreset">불러오기</button><button id="delPreset">삭제</button></div>
+      <div class="secbody">
+        <div class="row"><input type="text" id="presetName" placeholder="프리셋 이름"><button id="savePreset">저장</button></div>
+        <div class="row"><select id="presetList"></select><button id="loadPreset">불러오기</button><button id="delPreset" class="iconbtn" title="선택한 프리셋 삭제"><svg class="ic"><use href="#i-trash"/></svg></button></div>
+      </div>
     </details>
-
-    <div class="sec flat">
-      <div id="strengthBox"></div>
-      <div class="row"><button id="resetAll">설정 초기화</button></div>
-    </div>
+  </div>
+  <div class="ffoot">
+    <div id="strengthBox"></div>
+    <button id="resetAll" class="ghostbtn" title="보정 설정을 처음 상태로 돌립니다. 레이어와 이미지는 그대로예요.">초기화</button>
   </div>
 </section>
 
 <!-- 효과 옵션 (떠 있는 창) -->
-<section class="fwin" id="winFx" data-def="left:300,top:90,w:560" hidden>
-  <div class="fhead"><b>효과 옵션</b><span class="fbtns"><button class="fmin" title="접기">▁</button><button class="fclose" title="닫기">✕</button></span></div>
+<section class="fwin" id="winFx" data-def="left:300,top:90,w:560" data-title="효과 옵션" hidden>
+  <div class="fhead"><b><b class="fx">fx</b>효과 옵션</b><span class="fbtns">
+    <button class="fmin" title="접기"><svg class="ic"><use href="#i-min"/></svg></button>
+    <button class="fclose" title="닫기"><svg class="ic"><use href="#i-close"/></svg></button></span></div>
   <div class="fbody">
-    <div class="tabs" id="fxTabs"></div>
+    <div class="tabs pills" id="fxTabs"></div>
     <div id="fxCards"></div>
     <p class="hint">각 효과는 적용 대상(인물/배경/전체 화면)을 고를 수 있어요. 창은 제목줄을 끌어 옮기고, 오른쪽 아래 모서리로 크기를 바꿀 수 있어요.</p>
   </div>
 </section>
 
+<!-- 레이어 오른쪽 클릭 메뉴 -->
+<div id="ctxMenu" class="drop ctx" hidden>
+  <button data-cmd="rename">이름 바꾸기</button>
+  <button data-cmd="dupLayer">복제 <kbd>Ctrl+J</kbd></button>
+  <button data-cmd="delLayer">삭제 <kbd>Delete</kbd></button>
+  <hr>
+  <button data-cmd="roleCharacter" class="chk" data-role="character">인물</button>
+  <button data-cmd="roleBackground" class="chk" data-role="background">배경</button>
+  <button data-cmd="roleNone" class="chk" data-role="none">일반 (필터 없음)</button>
+  <hr>
+  <button data-cmd="fitCover">캔버스 꽉 채우기</button>
+  <button data-cmd="fitContain">캔버스 안에 맞추기</button>
+  <button data-cmd="fitNatural">원본 크기 (100%)</button>
+  <button data-cmd="flip">좌우 반전</button>
+  <button data-cmd="lockLayer" class="chk" id="ctxLock">잠금</button>
+</div>
+
 <!-- 캔버스 크기 -->
 <div id="sizeModal" class="modal" hidden>
   <div class="sheet small">
-    <b>캔버스 크기</b>
+    <b class="sheettitle">캔버스 크기</b>
     <div class="row"><label>가로 <input type="number" id="cw" min="16" max="8000"></label><label>세로 <input type="number" id="ch" min="16" max="8000"></label></div>
     <div class="row wrap" id="sizePresets"></div>
-    <label class="check"><input type="checkbox" id="keepCenter" checked> 레이어를 가운데 기준으로 유지</label>
-    <div class="row"><button id="sizeCancel">취소</button><button id="sizeOk" class="primary">적용</button></div>
+    <label class="check"><input type="checkbox" id="keepCenter" class="switch" checked> 레이어를 가운데 기준으로 유지</label>
+    <div class="row end"><button id="sizeCancel">취소</button><button id="sizeOk" class="primary">적용</button></div>
   </div>
 </div>
 

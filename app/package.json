@@ -1,7 +1,7 @@
 {
   "name": "illust-blend-filter",
   "productName": "IllustBlend",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "배경에 어우러지게 일러스트에 필터 레이어를 얹는 프로그램",
   "main": "main.js",
   "author": "IllustBlend",

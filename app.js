@@ -17,6 +17,7 @@ const S = {
   lockRatio: false,      // 터치용 비율 고정 (Shift와 같은 역할)
 };
 let nextId = 1;
+let opacitySync = null;  // 레이어 불투명도 슬라이더 동기화 (아래에서 만듦)
 const filterCache = new Map();
 let sceneCache = { key: '', canvas: null };
 
@@ -87,45 +88,140 @@ async function openFiles(files, target) {
 function roleName(r) { return r === 'character' ? '인물' : r === 'background' ? '배경' : '일반'; }
 
 // ---------- 레이어 패널 ----------
+const icon = (id, cls = '') => `<svg class="ic ${cls}"><use href="#i-${id}"/></svg>`;
 function renderLayers() {
+  if (ldrag && ldrag.active) return; // 끌어서 옮기는 중에는 다시 그리지 않음
   const box = $('#layerList'); box.innerHTML = '';
-  if (!S.layers.length) { box.innerHTML = '<div class="empty-note">레이어가 없어요.<br>＋ 새 레이어를 누르거나<br>이미지를 창에 끌어 놓으세요.</div>'; }
+  if (!S.layers.length) { box.innerHTML = '<div class="empty-note">레이어가 없어요.<br>아래 ＋ 버튼을 누르거나<br>이미지를 창에 끌어 놓으세요.</div>'; }
   for (const L of [...S.layers].reverse()) {
-    const r = document.createElement('div'); r.className = 'lrow' + (L.id === S.sel ? ' sel' : ''); r.dataset.id = L.id;
-    r.innerHTML = `<button class="eye ${L.visible ? '' : 'off'}" title="보이기/숨기기">👁</button>
-      ${L.img ? `<img class="thumb" src="${L.img.src}">` : '<div class="thumb"></div>'}
-      <div class="lmain"><div class="lname" title="두 번 클릭해서 이름 바꾸기"></div>
-        <div class="lbtns">
-          <button data-role="character" class="${L.role === 'character' ? 'on' : ''}" title="인물 필터 적용">인물</button>
-          <button data-role="background" class="${L.role === 'background' ? 'on' : ''}" title="배경 필터 적용">배경</button>
-          <button data-role="none" class="${L.role === 'none' ? 'on' : ''}" title="필터 없음">일반</button>
-          <button class="lock ${L.locked ? 'on' : ''}" title="잠금 (움직이지 않게)">${L.locked ? '🔒' : '🔓'}</button>
-        </div></div>`;
+    const r = document.createElement('div');
+    r.className = 'lrow' + (L.id === S.sel ? ' sel' : '') + (L.visible ? '' : ' off'); r.dataset.id = L.id;
+    r.title = '끌어서 순서 바꾸기 · 이름을 두 번 클릭하면 이름 바꾸기 · 오른쪽 클릭: 메뉴';
+    r.innerHTML = `<button class="eye" title="보이기/숨기기">${icon(L.visible ? 'eye' : 'eye-off')}</button>
+      <div class="thumb">${L.img ? `<img src="${L.img.src}" draggable="false" alt="">` : ''}</div>
+      <div class="lmain"><div class="lname"></div>
+        <div class="lmeta"><span class="tag ${L.role}">${roleName(L.role)}</span>${L.opacity < 1 ? `<span class="meta">${Math.round(L.opacity * 100)}%</span>` : ''}${L.flip ? '<span class="meta">반전</span>' : ''}</div></div>
+      <button class="lock ${L.locked ? 'on' : ''}" title="잠금 (움직이지 않게)">${icon(L.locked ? 'lock' : 'unlock')}</button>`;
     r.querySelector('.lname').textContent = L.name + (L.img ? '' : ' (비어 있음)');
     r.onclick = e => {
+      if (suppressClick) return;
       if (e.target.closest('.eye')) { L.visible = !L.visible; changed(); return; }
-      if (e.target.dataset.role) { L.role = e.target.dataset.role; S.sel = L.id; filterCache.delete(L.id); changed(); return; }
       if (e.target.closest('.lock')) { L.locked = !L.locked; changed(); return; }
-      S.sel = L.id; changed();
+      if (e.target.closest('input') || S.sel === L.id) return;
+      // 목록을 다시 만들지 않고 선택만 바꿈 (그래야 이름 두 번 클릭이 동작)
+      S.sel = L.id; $$('#layerList .lrow').forEach(x => x.classList.toggle('sel', +x.dataset.id === L.id));
+      syncLayerProps(); draw();
     };
+    r.oncontextmenu = e => { e.preventDefault(); S.sel = L.id; changed(); openCtxMenu(e.clientX, e.clientY); };
     r.querySelector('.lname').ondblclick = e => {
       const el = e.currentTarget, inp = document.createElement('input'); inp.type = 'text'; inp.value = L.name;
       el.innerHTML = ''; el.appendChild(inp); inp.focus(); inp.select();
       const done = () => { L.name = inp.value.trim() || L.name; L.autoName = false; renderLayers(); };
       inp.onblur = done; inp.onkeydown = k => { if (k.key === 'Enter') inp.blur(); if (k.key === 'Escape') { inp.value = L.name; inp.blur(); } };
     };
-    // 레이어 줄 위로 바로 끌어 놓기
+    // 레이어 줄 위로 이미지 파일 바로 끌어 놓기
     r.ondragover = e => { e.preventDefault(); e.stopPropagation(); r.classList.add('dropping'); };
     r.ondragleave = () => r.classList.remove('dropping');
     r.ondrop = e => { e.preventDefault(); e.stopPropagation(); r.classList.remove('dropping'); $('#stage').classList.remove('drag'); S.sel = L.id; openFiles(e.dataTransfer.files, L); };
     box.appendChild(r);
   }
-  $('#canvasInfo').textContent = `캔버스 ${S.doc.w}×${S.doc.h}`;
   const nc = S.layers.filter(l => l.role === 'character' && l.img).length, nb = S.layers.filter(l => l.role === 'background' && l.img).length;
-  $('#roleSummary').innerHTML = `인물 레이어 <b>${nc}</b>개 · 배경 레이어 <b>${nb}</b>개` +
-    (!nc || !nb ? '<br>레이어 패널에서 인물과 배경을 하나 이상 지정하면 자동 맞춤을 쓸 수 있어요.' : '');
+  $('#roleSummary').innerHTML = `인물 <b>${nc}</b> · 배경 <b>${nb}</b>` +
+    (!nc || !nb ? ' — 인물과 배경을 하나 이상 지정하면 자동 맞춤을 쓸 수 있어요.' : '');
+  syncLayerProps();
 }
-$('#canvasInfo').onclick = () => cmd('canvasSize');
+
+// 선택한 레이어의 속성 줄 (필터 대상 + 불투명도): 클립 스튜디오/포토샵의 레이어 패널 윗줄처럼
+function syncLayerProps() {
+  const L = selLayer();
+  $('#layerProps').classList.toggle('disabled', !L);
+  $$('#roleSeg button').forEach(b => b.classList.toggle('on', !!L && L.role === b.dataset.role));
+  if (opacitySync) opacitySync();
+}
+$$('#roleSeg button').forEach(b => b.onclick = () => {
+  const L = selLayer(); if (!L) return status('레이어를 먼저 선택하세요.');
+  L.role = b.dataset.role; filterCache.delete(L.id); changed();
+  status(`'${L.name}'을(를) ${roleName(L.role)} 레이어로 지정했어요.`);
+});
+
+// ---------- 레이어 끌어서 순서 바꾸기 ----------
+// 마우스: 누른 채 4px 이상 움직이면 시작. 터치: 0.28초 길게 누른 뒤 움직이면 시작 (그냥 쓸면 목록 스크롤).
+let ldrag = null, suppressClick = false;
+const LIST = $('#layerList');
+LIST.addEventListener('pointerdown', e => {
+  const row = e.target.closest('.lrow');
+  if (!row || e.button !== 0 || e.target.closest('button, input')) return;
+  ldrag = { id: +row.dataset.id, row, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, pid: e.pointerId, active: false, touch: e.pointerType === 'touch' };
+  if (ldrag.touch) { const d = ldrag; d.timer = setTimeout(() => { if (ldrag === d) startLayerDrag(); }, 280); }
+});
+window.addEventListener('pointermove', e => {
+  if (!ldrag || e.pointerId !== ldrag.pid) return;
+  ldrag.x = e.clientX; ldrag.y = e.clientY;
+  if (!ldrag.active) {
+    const dist = Math.hypot(e.clientX - ldrag.x0, e.clientY - ldrag.y0);
+    if (ldrag.touch) { if (dist > 8) { clearTimeout(ldrag.timer); ldrag = null; } return; }
+    if (dist < 4) return;
+    startLayerDrag();
+  }
+  moveLayerDrag();
+});
+window.addEventListener('pointerup', e => { if (ldrag && e.pointerId === ldrag.pid) endLayerDrag(true); });
+window.addEventListener('pointercancel', e => { if (ldrag && e.pointerId === ldrag.pid) endLayerDrag(false); });
+LIST.addEventListener('touchmove', e => { if (ldrag && ldrag.active) e.preventDefault(); }, { passive: false });
+function startLayerDrag() {
+  const d = ldrag, rect = d.row.getBoundingClientRect();
+  d.active = true; suppressClick = true;
+  d.ghost = d.row.cloneNode(true); d.ghost.classList.add('ghost'); d.ghost.removeAttribute('title');
+  Object.assign(d.ghost.style, { width: rect.width + 'px', left: rect.left + 'px', top: rect.top + 'px' });
+  d.offY = d.y0 - rect.top;
+  document.body.appendChild(d.ghost); document.body.classList.add('reordering');
+  d.row.classList.add('dragging');
+  d.line = document.createElement('div'); d.line.className = 'dropline'; LIST.appendChild(d.line);
+  moveLayerDrag();
+}
+function moveLayerDrag() {
+  const d = ldrag, lr = LIST.getBoundingClientRect();
+  d.ghost.style.top = clamp(d.y - d.offY, lr.top - 20, lr.bottom - 20) + 'px';
+  if (d.y < lr.top + 28) LIST.scrollTop -= 10; else if (d.y > lr.bottom - 28) LIST.scrollTop += 10;
+  const rows = $$('#layerList .lrow');
+  let k = rows.findIndex(r => { const b = r.getBoundingClientRect(); return d.y < b.top + b.height / 2; });
+  if (k < 0) k = rows.length;
+  d.k = k;
+  const top = k < rows.length ? rows[k].offsetTop : (rows.length ? rows[rows.length - 1].offsetTop + rows[rows.length - 1].offsetHeight : 0);
+  d.line.style.top = (top - 1) + 'px';
+  const di = rows.indexOf(d.row);
+  d.line.hidden = (k === di || k === di + 1); // 제자리면 표시 안 함
+}
+function endLayerDrag(commit) {
+  const d = ldrag; ldrag = null; clearTimeout(d.timer);
+  if (!d.active) return;
+  d.ghost.remove(); d.line.remove(); d.row.classList.remove('dragging'); document.body.classList.remove('reordering');
+  setTimeout(() => { suppressClick = false; }, 0);
+  if (commit) {
+    const order = [...S.layers].reverse(), di = order.findIndex(l => l.id === d.id);
+    let k = d.k; if (k > di) k--;
+    if (k !== di && di >= 0) {
+      const [L] = order.splice(di, 1); order.splice(k, 0, L);
+      S.layers = order.reverse(); S.sel = L.id;
+      changed(); status(`'${L.name}' 레이어의 순서를 바꿨어요.`); return;
+    }
+    const L = S.layers.find(l => l.id === d.id); if (L) S.sel = L.id;
+  }
+  changed();
+}
+
+// ---------- 오른쪽 클릭 메뉴 ----------
+function openCtxMenu(x, y) {
+  const m = $('#ctxMenu'), L = selLayer(); if (!L) return;
+  closeMenus();
+  $$('#ctxMenu [data-role]').forEach(b => b.classList.toggle('checked', b.dataset.role === L.role));
+  $('#ctxLock').classList.toggle('checked', L.locked);
+  m.hidden = false;
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.min(x, innerWidth - w - 6) + 'px'; m.style.top = Math.min(y, innerHeight - h - 6) + 'px';
+}
+$('#docInfo').onclick = () => cmd('canvasSize');
+$('#zoomInfo').onclick = () => cmd('zoomFit');
 
 // ======================= 뷰포트 / 그리기 =======================
 const dpr = () => window.devicePixelRatio || 1;
@@ -213,6 +309,7 @@ function drawNow() {
   }
   releaseTemps();
   $('#zoomInfo').textContent = `${Math.round(v.zoom * 100)}%`;
+  $('#docInfo').textContent = `${S.doc.w} × ${S.doc.h}`;
   $('#compareBadge').hidden = !S.compare;
 }
 function toScreen(x, y) { return [S.view.ox + x * S.view.zoom, S.view.oy + y * S.view.zoom]; }
@@ -336,11 +433,17 @@ function cmd(name) {
     case 'down': if (L && i > 0) { S.layers.splice(i, 1); S.layers.splice(i - 1, 0, L); changed(); } break;
     case 'canvasSize': openSizeDialog(); break;
     case 'rename': { const n = document.querySelector('.lrow.sel .lname'); if (n) n.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); break; }
-    case 'togglePanel': $('#layersPanel').classList.toggle('collapsed'); draw(); break;
-    case 'lockRatio': S.lockRatio = !S.lockRatio; $('#ratioBtn').classList.toggle('on', S.lockRatio); status(S.lockRatio ? '비율 고정 켜짐: 크기를 바꿀 때 가로세로 비율이 유지돼요.' : '비율 고정 꺼짐: 가로나 세로만 늘릴 수 있어요.'); break;
+    case 'togglePanel': $('#layersPanel').classList.toggle('collapsed'); layoutChanged(); break;
+    case 'toggleDock': { const w = $('#winComp'); if (isDocked(w) && !w.hidden && !$('#dock').classList.contains('collapsed')) { $('#dock').classList.add('collapsed'); layoutChanged(); } else { $('#dock').classList.remove('collapsed'); showWin('winComp'); } break; }
+    case 'togglePanels': { // 포토샵/클립 스튜디오의 Tab: 패널 모두 숨기기/보이기
+      const lp = $('#layersPanel'), dk = $('#dock'), hide = !(lp.classList.contains('collapsed') && dk.classList.contains('collapsed'));
+      lp.classList.toggle('collapsed', hide); dk.classList.toggle('collapsed', hide); layoutChanged(); break; }
+    case 'lockRatio': S.lockRatio = !S.lockRatio; $('#ratioBtn').classList.toggle('on', S.lockRatio); $('#ratioItem').classList.toggle('checked', S.lockRatio); status(S.lockRatio ? '비율 고정 켜짐: 크기를 바꿀 때 가로세로 비율이 유지돼요.' : '비율 고정 꺼짐: 가로나 세로만 늘릴 수 있어요.'); break;
+    case 'lockLayer': if (L) { L.locked = !L.locked; changed(); } break;
     case 'export': exportPng(); break;
-    case 'winComp': showWin('winComp'); break;
-    case 'winFx': showWin('winFx'); break;
+    case 'winComp': { const w = $('#winComp'); if (!w.hidden && !(isDocked(w) && $('#dock').classList.contains('collapsed'))) hideWin(w); else { $('#dock').classList.remove('collapsed'); showWin('winComp'); } break; }
+    case 'winFx': { const w = $('#winFx'); if (w.hidden) showWin('winFx'); else hideWin(w); break; }
+    case 'dockComp': { const w = $('#winComp'); dockWin(w, !isDocked(w)); showWin('winComp'); break; }
     case 'resetWins': resetWins(); break;
     case 'zoomFit': fitView(); break;
     case 'zoom100': { const r = vp.getBoundingClientRect(); zoomAt(1 / S.view.zoom, r.width / 2, r.height / 2); break; }
@@ -351,15 +454,25 @@ function cmd(name) {
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-cmd]');
   if (b) { closeMenus(); cmd(b.dataset.cmd); return; }
+  if (!e.target.closest('#ctxMenu')) $('#ctxMenu').hidden = true;
   const m = e.target.closest('.menu > button');
   if (m) { const menu = m.parentElement, open = menu.classList.contains('open'); closeMenus(); if (!open) menu.classList.add('open'); return; }
   if (!e.target.closest('.drop')) closeMenus();
 });
 $$('.menu').forEach(m => m.addEventListener('mouseenter', () => { if ($('.menu.open') && !m.classList.contains('open')) { closeMenus(); m.classList.add('open'); } }));
-function closeMenus() { $$('.menu.open').forEach(m => m.classList.remove('open')); }
+function closeMenus() { $$('.menu.open').forEach(m => m.classList.remove('open')); $('#ctxMenu').hidden = true; syncMenuChecks(); }
+function syncMenuChecks() {
+  const comp = $('#winComp'), compShown = !comp.hidden && !(isDocked(comp) && $('#dock').classList.contains('collapsed'));
+  $('#panelItem').classList.toggle('checked', !$('#layersPanel').classList.contains('collapsed'));
+  $('#compItem').classList.toggle('checked', compShown);
+  $('#fxItem').classList.toggle('checked', !$('#winFx').hidden);
+  $('#dockItem').textContent = isDocked(comp) ? '합성 패널 떼어내기 (떠 있는 창으로)' : '합성 패널 오른쪽에 붙이기';
+}
+document.addEventListener('contextmenu', e => { if (!e.target.closest('.lrow, input, textarea')) e.preventDefault(); });
 
 window.addEventListener('keydown', e => {
   const typing = e.target.matches('input[type=text], input[type=number]');
+  const onControl = e.target.matches('input[type=range], select'); // 슬라이더/선택칸에 있을 땐 방향키·Delete를 그 칸이 씀
   if (e.code === 'Space' && !typing) { spaceDown = true; if (!drag) vp.style.cursor = 'grab'; e.preventDefault(); }
   const k = e.key.toLowerCase(), ctrl = e.ctrlKey || e.metaKey;
   if (ctrl && k === 'o') { e.preventDefault(); cmd('open'); }
@@ -375,8 +488,10 @@ window.addEventListener('keydown', e => {
   else if (ctrl && k === '[') { e.preventDefault(); cmd('down'); }
   else if (typing) return;
   else if (k === 'f' || k === 'ㄹ') toggleCompare();
-  else if (k === 'delete') cmd('delLayer');
+  else if (k === 'tab' && !ctrl && !e.altKey) { e.preventDefault(); cmd('togglePanels'); }
   else if (k === 'escape') { closeMenus(); $('#sizeModal').hidden = true; }
+  else if (onControl) return;
+  else if (k === 'delete') cmd('delLayer');
   else if (k.startsWith('arrow')) {
     const L = selLayer(); if (!L || L.locked) return; e.preventDefault();
     const s = e.shiftKey ? 10 : 1; if (k === 'arrowleft') L.x -= s; if (k === 'arrowright') L.x += s; if (k === 'arrowup') L.y -= s; if (k === 'arrowdown') L.y += s;
@@ -390,60 +505,186 @@ function toggleCompare() { S.compare = !S.compare; $('#compareBtn').classList.to
 $('#compareBtn').onclick = toggleCompare;
 $('#exportTop').onclick = () => cmd('export');
 
-// ======================= 떠 있는 창 =======================
-const WKEY = 'illustblend.windows';
+// ======================= 패널 · 떠 있는 창 · 도킹 =======================
+// 합성 패널은 기본으로 오른쪽에 붙어 있고(프리미어/포토샵의 속성 패널처럼), 제목줄을 끌면 떠 있는 창이 된다.
+// 떠 있는 창을 화면 오른쪽 끝으로 끌어다 놓으면 다시 붙는다.
+const WKEY = 'illustblend.windows2', LKEY = 'illustblend.layout';
+const DOCK = $('#dock');
 function readWins() { try { return JSON.parse(localStorage.getItem(WKEY)) || {}; } catch { return {}; } }
-function saveWin(w) { const all = readWins(); all[w.id] = { left: w.offsetLeft, top: w.offsetTop, width: w.offsetWidth, height: w.classList.contains('min') ? null : w.offsetHeight, hidden: w.hidden, min: w.classList.contains('min') }; try { localStorage.setItem(WKEY, JSON.stringify(all)); } catch {} }
-function placeWin(w, saved) {
-  const def = Object.fromEntries(w.dataset.def.split(',').map(s => s.split(':')).map(([k, v]) => [k, +v]));
-  const width = saved?.width || def.w;
-  w.style.width = width + 'px';
-  w.style.left = (saved ? saved.left : def.left !== undefined ? def.left : window.innerWidth - width - def.right) + 'px';
-  w.style.top = (saved ? saved.top : def.top) + 'px';
-  w.style.height = saved?.height ? saved.height + 'px' : '';
-  if (saved) { w.hidden = saved.hidden; w.classList.toggle('min', !!saved.min); }
-  else if (window.innerWidth < 760) w.classList.add('min'); // 좁은 화면에선 접힌 채로 시작
+function isDocked(w) { return w.parentElement === DOCK; }
+function saveWin(w) {
+  const all = readWins(), prev = all[w.id] || {};
+  const rec = { docked: isDocked(w), hidden: w.hidden, min: w.classList.contains('min'), float: prev.float || null };
+  if (!rec.docked) rec.float = { left: w.offsetLeft, top: w.offsetTop, width: w.offsetWidth, height: !rec.min && w.style.height ? parseInt(w.style.height) : (prev.float?.height ?? null) };
+  all[w.id] = rec; try { localStorage.setItem(WKEY, JSON.stringify(all)); } catch {}
 }
-function resetWins() { try { localStorage.removeItem(WKEY); } catch {} $$('.fwin').forEach(w => { placeWin(w, null); w.classList.remove('min'); }); showWin('winComp'); }
-function showWin(id) { const w = $('#' + id); w.hidden = false; w.classList.remove('min'); front(w); keepInView(w); saveWin(w); }
+function placeFloat(w, f) {
+  const def = Object.fromEntries(w.dataset.def.split(',').map(s => s.split(':')).map(([k, v]) => [k, +v]));
+  const width = Math.min(f?.width || def.w, innerWidth - 16);
+  w.style.width = width + 'px';
+  w.style.left = (f ? f.left : def.left !== undefined ? def.left : innerWidth - width - def.right) + 'px';
+  w.style.top = (f ? f.top : def.top) + 'px';
+  w.style.height = f?.height ? f.height + 'px' : '';
+}
+function dockWin(w, on, quiet) {
+  if (on) { DOCK.appendChild(w); w.classList.add('docked'); w.removeAttribute('style'); DOCK.classList.remove('collapsed'); }
+  else { document.body.appendChild(w); w.classList.remove('docked'); placeFloat(w, readWins()[w.id]?.float); keepInView(w); front(w); }
+  if (!quiet) saveWin(w);
+  layoutChanged();
+}
+function hideWin(w) {
+  w.hidden = true; saveWin(w); layoutChanged();
+  status('닫은 창은 메뉴의 창 → ' + w.dataset.title + '으로 다시 열 수 있어요.');
+}
+function showWin(id) {
+  const w = $('#' + id); w.hidden = false; w.classList.remove('min');
+  if (isDocked(w)) DOCK.classList.remove('collapsed'); else { front(w); keepInView(w); }
+  saveWin(w); layoutChanged();
+}
+function resetWins() {
+  try { localStorage.removeItem(WKEY); localStorage.removeItem(LKEY); } catch {}
+  for (const k of Object.keys(LAYOUT)) delete LAYOUT[k]; applyLayout();
+  $('#layersPanel').classList.remove('collapsed');
+  for (const w of $$('.fwin')) { w.classList.remove('min'); if (w.dataset.dock) dockWin(w, true, true); else { placeFloat(w, null); keepInView(w); } }
+  showWin('winComp');
+}
 function front(w) { $$('.fwin').forEach(o => o.classList.toggle('front', o === w)); }
-function keepInView(w) { w.style.left = clamp(w.offsetLeft, 0, window.innerWidth - 80) + 'px'; w.style.top = clamp(w.offsetTop, 34, window.innerHeight - 40) + 'px'; }
+function keepInView(w) {
+  if (isDocked(w)) return;
+  const top = $('#menubar').offsetHeight;
+  w.style.left = clamp(w.offsetLeft, Math.min(0, innerWidth - w.offsetWidth), innerWidth - 80) + 'px';
+  w.style.top = clamp(w.offsetTop, top, innerHeight - 40) + 'px';
+}
+// 패널이 보이거나 숨겨지면 캔버스 영역 크기가 바뀜
+function layoutChanged() {
+  const dockUsed = [...DOCK.children].some(c => !c.hidden);
+  document.body.classList.toggle('dock-off', !dockUsed || DOCK.classList.contains('collapsed'));
+  document.body.classList.toggle('layers-off', $('#layersPanel').classList.contains('collapsed'));
+  $$('.narrow-r').forEach(b => b.classList.toggle('on', !document.body.classList.contains('dock-off')));
+  $$('.narrow-l').forEach(b => b.classList.toggle('on', !document.body.classList.contains('layers-off')));
+  syncMenuChecks(); draw();
+}
 for (const w of $$('.fwin')) {
-  placeWin(w, readWins()[w.id]);
-  w.addEventListener('pointerdown', () => front(w));
+  const saved = readWins()[w.id];
+  if (w.dataset.dock && saved?.docked !== false) dockWin(w, true, true);
+  else placeFloat(w, saved?.float);
+  if (saved) { w.hidden = saved.hidden; w.classList.toggle('min', !!saved.min); }
+  w.addEventListener('pointerdown', () => { if (!isDocked(w)) front(w); });
   const head = w.querySelector('.fhead');
   head.addEventListener('pointerdown', e => {
-    if (e.target.closest('button')) return;
-    head.setPointerCapture(e.pointerId);
-    const sx = e.clientX - w.offsetLeft, sy = e.clientY - w.offsetTop;
-    const mv = ev => { w.style.left = ev.clientX - sx + 'px'; w.style.top = ev.clientY - sy + 'px'; keepInView(w); };
-    const up = () => { head.removeEventListener('pointermove', mv); head.removeEventListener('pointerup', up); saveWin(w); };
-    head.addEventListener('pointermove', mv); head.addEventListener('pointerup', up);
+    if (e.target.closest('button') || e.button !== 0) return;
+    const x0 = e.clientX, y0 = e.clientY, pid = e.pointerId;
+    let started = !isDocked(w), sx = e.clientX - w.offsetLeft, sy = e.clientY - w.offsetTop, near = false;
+    const mv = ev => {
+      if (ev.pointerId !== pid) return;
+      if (!started) {
+        if (Math.hypot(ev.clientX - x0, ev.clientY - y0) < 8) return;
+        const r = w.getBoundingClientRect(); // 붙어 있던 창을 끌면 떼어냄
+        dockWin(w, false, true);
+        w.style.width = r.width + 'px'; w.style.height = '';
+        sx = x0 - r.left; sy = y0 - r.top; started = true;
+      }
+      w.style.left = ev.clientX - sx + 'px'; w.style.top = ev.clientY - sy + 'px'; keepInView(w);
+      if (w.dataset.dock) { near = ev.clientX > innerWidth - 56; $('#dockHint').hidden = !near; w.classList.toggle('will-dock', near); }
+    };
+    const up = ev => {
+      if (ev.pointerId !== pid) return;
+      removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+      $('#dockHint').hidden = true; w.classList.remove('will-dock');
+      if (!started) return;
+      if (near) { dockWin(w, true); status('합성 패널을 오른쪽에 붙였어요.'); } else saveWin(w);
+    };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
   });
-  head.ondblclick = () => { w.classList.toggle('min'); saveWin(w); };
+  head.ondblclick = e => { if (e.target.closest('button')) return; w.classList.toggle('min'); saveWin(w); };
   w.querySelector('.fmin').onclick = () => { w.classList.toggle('min'); saveWin(w); };
-  w.querySelector('.fclose').onclick = () => { w.hidden = true; saveWin(w); status('닫은 창은 메뉴의 창 → ' + w.querySelector('.fhead b').textContent + '으로 다시 열 수 있어요.'); };
-  w.addEventListener('pointerup', () => saveWin(w));
+  w.querySelector('.fclose').onclick = () => hideWin(w);
+  const pop = w.querySelector('.fpop'); if (pop) pop.onclick = () => cmd('dockComp');
+  w.addEventListener('pointerup', () => { if (!isDocked(w)) saveWin(w); });
 }
+
+// 패널 너비 조절 (경계선 끌기, 두 번 클릭 = 기본 너비)
+const LAYOUT = (() => { try { return JSON.parse(localStorage.getItem(LKEY)) || {}; } catch { return {}; } })();
+function applyLayout() {
+  const b = $('#body');
+  if (LAYOUT.lw) b.style.setProperty('--layers-w', LAYOUT.lw + 'px'); else b.style.removeProperty('--layers-w');
+  if (LAYOUT.dw) b.style.setProperty('--dock-w', LAYOUT.dw + 'px'); else b.style.removeProperty('--dock-w');
+}
+function saveLayout() { try { localStorage.setItem(LKEY, JSON.stringify(LAYOUT)); } catch {} }
+for (const [el, key, panel, dir] of [[$('#splitL'), 'lw', $('#layersPanel'), 1], [$('#splitR'), 'dw', DOCK, -1]]) {
+  el.addEventListener('pointerdown', e => {
+    el.setPointerCapture(e.pointerId); el.classList.add('active');
+    const w0 = panel.offsetWidth, x0 = e.clientX;
+    const mv = ev => { LAYOUT[key] = Math.round(clamp(w0 + dir * (ev.clientX - x0), 220, 560)); applyLayout(); draw(); };
+    const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.classList.remove('active'); saveLayout(); };
+    el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up);
+  });
+  el.ondblclick = () => { delete LAYOUT[key]; applyLayout(); saveLayout(); draw(); };
+}
+applyLayout();
 
 // ======================= 합성 패널 컨트롤 =======================
 const syncFns = [];
-function slider(parent, getObj, key, label, min, max, step = 1, digits = 0, def) {
+// 슬라이더 한 줄: 이름 | 막대 | 값. 값(파란 숫자)은 프리미어/AE처럼 좌우로 끌어서 바꾸거나 눌러서 직접 입력.
+function slider(parent, getObj, key, label, min, max, step = 1, digits = 0, def, after = edited) {
   const d = document.createElement('div'); d.className = 'ctl';
-  d.innerHTML = `<div class="top"><span>${label}</span><input class="num" type="text"></div><input type="range" min="${min}" max="${max}" step="${step}">`;
+  d.innerHTML = `<span class="lab" title="${label}">${label}</span><input type="range" min="${min}" max="${max}" step="${step}"><input class="num" type="text" inputmode="decimal" title="좌우로 끌어서 조절 (Shift: 크게, Ctrl: 미세하게) · 눌러서 직접 입력">`;
   const r = d.querySelector('input[type=range]'), n = d.querySelector('.num');
-  const set = v => { v = clamp(+v, min, max); if (isNaN(v)) return; getObj()[key] = v; edited(); };
+  const dv = def ?? (min < 0 ? 0 : min);
+  if (dv > min && dv < max && min >= 0) r.dataset.zero = dv; // 감마처럼 기본값이 가운데인 값은 그 점부터 채움
+  const set = v => { v = clamp(+v, min, max); if (isNaN(v)) return; getObj()[key] = v; after(); };
   r.addEventListener('input', () => set(r.value));
   r.addEventListener('pointerdown', () => { S.interacting = true; });
   r.addEventListener('change', () => { S.interacting = false; draw(); });
   n.addEventListener('change', () => set(n.value));
-  r.addEventListener('dblclick', () => set(def ?? (min < 0 ? 0 : min)));
+  n.addEventListener('keydown', e => {
+    if (e.key === 'Enter') n.blur();
+    else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); set(+getObj()[key] + (e.key === 'ArrowUp' ? 1 : -1) * step * (e.shiftKey ? 10 : 1)); n.select(); }
+  });
+  n.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch' || document.activeElement === n || e.button !== 0) return;
+    e.preventDefault();
+    const x0 = e.clientX, v0 = +getObj()[key], per = Math.max(step, (max - min) / 300); let moved = false;
+    n.setPointerCapture(e.pointerId);
+    const mv = ev => {
+      const dx = ev.clientX - x0; if (!moved && Math.abs(dx) < 3) return;
+      if (!moved) { moved = true; S.interacting = true; document.body.classList.add('scrubbing'); }
+      set(Math.round((v0 + dx * per * (ev.shiftKey ? 10 : ev.ctrlKey ? 0.1 : 1)) / step) * step);
+    };
+    const up = () => {
+      n.removeEventListener('pointermove', mv); n.removeEventListener('pointerup', up); n.removeEventListener('pointercancel', up);
+      document.body.classList.remove('scrubbing');
+      if (moved) { S.interacting = false; draw(); } else { n.focus(); n.select(); }
+    };
+    n.addEventListener('pointermove', mv); n.addEventListener('pointerup', up); n.addEventListener('pointercancel', up);
+  });
+  r.addEventListener('dblclick', () => set(dv));
+  d.querySelector('.lab').addEventListener('dblclick', () => set(dv));
   r.title = '더블클릭하면 기본값';
   parent.appendChild(d);
-  syncFns.push(() => { const v = getObj()[key]; r.value = v; n.value = (+v).toFixed(digits); });
+  const sync = () => { const v = getObj()[key]; r.value = v; paintRange(r); if (document.activeElement !== n) n.value = (+v).toFixed(digits); };
+  syncFns.push(sync); d.sync = sync;
   return d;
 }
+// 막대의 채워진 부분 (0점 또는 기본값에서 현재 값까지)
+function paintRange(r) {
+  const min = +r.min, max = +r.max, span = (max - min) || 1, v = +r.value;
+  const z = r.dataset.zero !== undefined ? +r.dataset.zero : clamp(0, min, max);
+  r.style.setProperty('--a', (Math.min(z, v) - min) / span * 100 + '%');
+  r.style.setProperty('--b', (Math.max(z, v) - min) / span * 100 + '%');
+}
+document.addEventListener('input', e => { if (e.target.matches('input[type=range]')) paintRange(e.target); });
 function edited() { S.feel = null; syncUI(); draw(); }
+
+// 레이어 불투명도 (레이어 패널 윗줄)
+{
+  const box = $('#opacityBox');
+  const ctl = slider(box, () => ({ get v() { const L = selLayer(); return L ? Math.round(L.opacity * 100) : 100; }, set v(x) { const L = selLayer(); if (L) L.opacity = x / 100; } }),
+    'v', '불투명도', 0, 100, 1, 0, 100, () => { ctl.sync(); draw(); clearTimeout(ctl.t); ctl.t = setTimeout(renderLayers, 150); });
+  syncFns.splice(syncFns.indexOf(ctl.sync), 1); // 보정 값과 따로 동기화
+  ctl.querySelector('.num').insertAdjacentHTML('afterend', '<span class="unit">%</span>');
+  opacitySync = ctl.sync;
+}
 
 // 빠른 느낌
 for (const f of FEELS) {
@@ -492,7 +733,7 @@ slider($('#basic'), B, 'blur', '흐림', 0, 30, 0.5, 1);
 const LT = () => S.p.light;
 slider($('#lightA'), LT, 'intensity', '빛 세기', 0, 100);
 slider($('#lightA'), LT, 'backlight', '역광 그림자', 0, 100);
-slider($('#lightB'), LT, 'depth', '빛 깊이 (테두리 두께)', 1, 30, 1, 0, 5);
+slider($('#lightB'), LT, 'depth', '테두리 두께', 1, 30, 1, 0, 5);
 $('#rimOn').onchange = e => { S.p.light.rimOn = e.target.checked; edited(); };
 $('#lightColor').oninput = e => { S.p.light.color = e.target.value; edited(); };
 for (const [v, t] of [[225, '↖'], [270, '↑'], [315, '↗'], [180, '←'], ['front', '☀'], [0, '→'], [135, '↙'], [90, '↓'], [45, '↘']]) {
@@ -502,7 +743,7 @@ for (const [v, t] of [[225, '↖'], [270, '↑'], [315, '↗'], [180, '←'], ['
 }
 
 // 효과: 글로우 + 컬러 프리셋 줄
-slider($('#glowBox'), () => S.p, 'glow', '글로우 세기 (인물)', 0, 100);
+slider($('#glowBox'), () => S.p, 'glow', '글로우 (인물)', 0, 100);
 function renderColorRows() {
   const box = $('#colorRows'); box.innerHTML = '';
   S.p.colors.forEach((row, i) => {
@@ -515,14 +756,14 @@ function renderColorRows() {
     tg.value = row.target; tg.onchange = () => { row.target = tg.value; edited(); };
     const r = document.createElement('input'); r.type = 'range'; r.min = 0; r.max = 100; r.value = row.amount; r.title = `양 ${row.amount}`;
     r.oninput = () => { row.amount = +r.value; r.title = `양 ${row.amount}`; edited(); };
-    const x = document.createElement('button'); x.className = 'x'; x.textContent = '✕'; x.title = '빼기';
+    const x = document.createElement('button'); x.className = 'x iconbtn'; x.innerHTML = icon('close'); x.title = '빼기';
     x.onclick = () => { S.p.colors.splice(i, 1); renderColorRows(); edited(); };
     d.append(sel, tg, r, x); box.appendChild(d);
   });
 }
 $('#addColor').onclick = () => { S.p.colors.push({ id: 'sunset', amount: 50, target: 'character' }); renderColorRows(); edited(); };
 $('#openFx').onclick = () => showWin('winFx');
-slider($('#strengthBox'), () => ({ get v() { return Math.round(S.strength * 100); }, set v(x) { S.strength = x / 100; } }), 'v', '전체 필터 강도 (%)', 0, 100, 1, 0, 100);
+slider($('#strengthBox'), () => ({ get v() { return Math.round(S.strength * 100); }, set v(x) { S.strength = x / 100; } }), 'v', '필터 강도', 0, 100, 1, 0, 100);
 $('#resetAll').onclick = () => { S.p = defaultSettings(); S.strength = 1; S.feel = null; renderColorRows(); syncUI(); draw(); status('보정 설정을 처음 상태로 돌렸어요. 레이어와 이미지는 그대로예요.'); };
 
 // ======================= 효과 옵션 창 =======================
@@ -536,7 +777,7 @@ S.fxTab = -2;
 for (const d of EFFECTS) {
   const card = document.createElement('div'); card.className = 'card';
   const F = () => S.p.effects[d.type];
-  card.innerHTML = `<div class="head"><label class="check"><input type="checkbox"> <b>${d.name}</b></label><select title="적용 대상"></select></div><div class="desc">${d.desc}</div>`;
+  card.innerHTML = `<div class="head"><label class="check"><input type="checkbox" class="switch"> <b>${d.name}</b></label><select title="적용 대상"></select></div><div class="desc">${d.desc}</div>`;
   const cb = card.querySelector('input'), tg = card.querySelector('select');
   for (const [t, n] of TARGETS) { const o = document.createElement('option'); o.value = t; o.textContent = n; tg.appendChild(o); }
   cb.onchange = () => { F().on = cb.checked; edited(); };
@@ -549,6 +790,7 @@ for (const d of EFFECTS) {
 
 function syncUI() {
   syncFns.forEach(f => f());
+  $$('#colorRows input[type=range]').forEach(paintRange);
   $$('#basicTabs button').forEach(b => b.classList.toggle('on', b.dataset.t === S.basicTab));
   $('#rimOn').checked = S.p.light.rimOn; $('#lightColor').value = S.p.light.color;
   $$('#dirGrid button').forEach(b => b.classList.toggle('on', String(S.p.light.dir) === b.dataset.v));
@@ -643,4 +885,6 @@ async function exportPng() {
 function changed() { renderLayers(); draw(); }
 refreshPresetList(); renderColorRows(); syncUI(); renderLayers();
 if (window.innerWidth < 760) $('#layersPanel').classList.add('collapsed');
+if (window.innerWidth < 1100) DOCK.classList.add('collapsed'); // 좁은 화면(아이패드 세로 등)에선 합성 패널을 위에 덮는 서랍으로
+layoutChanged();
 requestAnimationFrame(fitView);
